@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Générateur de Dictionnaire — Eli Daniel</title>
+    <style>
+        :root { --primary:#6C63FF; --secondary:#FF2E63; --dark:#0D0D0D; --light:#F8F8F8; --gradient:linear-gradient(45deg,#6C63FF,#FF2E63); }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--dark); color:var(--light); line-height:1.6; padding:2rem 1rem 4rem; }
+        .wrap { max-width:640px; margin:0 auto; }
+        header { text-align:center; margin-bottom:2rem; }
+        h1 { font-size:clamp(1.5rem,5vw,2.2rem); background:var(--gradient); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:.5rem; }
+        header p { opacity:.82; }
+        .back { display:inline-block; margin-top:.8rem; color:var(--primary); text-decoration:none; opacity:.85; }
+        .back:hover { opacity:1; }
+        .card { background:rgba(30,30,30,.8); border:1px solid rgba(108,99,255,.25); border-radius:16px; padding:1.6rem; display:flex; flex-direction:column; gap:1rem; }
+        .row { display:flex; gap:1rem; flex-wrap:wrap; }
+        .field { display:flex; flex-direction:column; gap:.35rem; flex:1; min-width:120px; font-size:.9rem; }
+        input[type=number], input[type=text] { background:rgba(13,13,13,.6); border:1px solid rgba(108,99,255,.3); border-radius:8px; color:var(--light); padding:.55rem .7rem; font-family:inherit; font-size:.95rem; width:100%; }
+        input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 2px rgba(108,99,255,.25); }
+        fieldset { border:1px solid rgba(108,99,255,.2); border-radius:12px; padding:1rem; }
+        legend { padding:0 .5rem; font-weight:600; color:var(--primary); font-size:.95rem; }
+        .sets { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:.9rem; }
+        .set { display:flex; flex-direction:column; gap:.5rem; }
+        .check { display:flex; align-items:center; gap:.45rem; font-size:.9rem; cursor:pointer; user-select:none; }
+        .check input { width:1.05rem; height:1.05rem; accent-color:var(--primary); cursor:pointer; }
+        .special { display:flex; flex-wrap:wrap; gap:.4rem 1rem; margin-bottom:.8rem; }
+        button { background:var(--gradient); color:var(--light); border:none; border-radius:8px; padding:.8rem; font-size:1rem; font-weight:600; cursor:pointer; transition:transform .2s, box-shadow .2s; }
+        button:hover { transform:translateY(-2px); box-shadow:0 5px 16px rgba(255,46,99,.3); }
+        button.secondaire { background:rgba(108,99,255,.15); border:1px solid rgba(108,99,255,.4); }
+        .stats { display:flex; justify-content:space-between; gap:1rem; font-size:.9rem; opacity:.9; flex-wrap:wrap; }
+        .stats strong { color:var(--primary); }
+        .log { width:100%; min-height:150px; max-height:260px; resize:vertical; background:rgba(13,13,13,.7); border:1px solid rgba(108,99,255,.2); border-radius:10px; color:#b8f0c0; font-family:'Courier New',monospace; font-size:.82rem; line-height:1.5; padding:.8rem; white-space:pre; overflow:auto; }
+        footer { text-align:center; margin-top:2rem; opacity:.6; font-size:.85rem; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <header>
+            <h1>Générateur de Dictionnaire</h1>
+            <p>Version web de mon application WPF. La logique C# (jeu de caractères + énumération des combinaisons) est reprise et tourne côté serveur. <strong>Démo</strong> : génération plafonnée pour rester fluide.</p>
+            <a class="back" href="https://elidaniel007.github.io/projets.html">← Retour aux projets</a>
+        </header>
+
+        <div class="card">
+            <div class="row">
+                <label class="field">Longueur min<input type="number" id="min" value="1" min="1"></label>
+                <label class="field">Longueur max<input type="number" id="max" value="3" min="1"></label>
+            </div>
+
+            <fieldset>
+                <legend>Caractères permis</legend>
+                <div class="sets">
+                    <div class="set">
+                        <label class="check"><input type="checkbox" id="lower" checked> Minuscules (a-z)</label>
+                        <input type="text" id="lowerCustom" placeholder="ou perso : abcd">
+                    </div>
+                    <div class="set">
+                        <label class="check"><input type="checkbox" id="upper"> Majuscules (A-Z)</label>
+                        <input type="text" id="upperCustom" placeholder="ou perso : ABCD">
+                    </div>
+                    <div class="set">
+                        <label class="check"><input type="checkbox" id="digits"> Chiffres (0-9)</label>
+                        <input type="text" id="numberCustom" placeholder="ou perso : 123">
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend>Caractères spéciaux</legend>
+                <div class="special">
+                    <label class="check"><input type="checkbox" class="sp" value="#"> #</label>
+                    <label class="check"><input type="checkbox" class="sp" value="$"> $</label>
+                    <label class="check"><input type="checkbox" class="sp" value="%"> %</label>
+                    <label class="check"><input type="checkbox" class="sp" value="&"> &amp;</label>
+                    <label class="check"><input type="checkbox" class="sp" value="*"> *</label>
+                    <label class="check"><input type="checkbox" class="sp" value="?"> ?</label>
+                </div>
+                <input type="text" id="customSpecial" placeholder="ou perso : @!+">
+            </fieldset>
+
+            <button id="btnGenerer">⚙️ Générer le dictionnaire</button>
+
+            <div class="stats">
+                <span>Mots générés : <strong id="count">0</strong></span>
+                <span>Caractères : <strong id="charset">—</strong></span>
+            </div>
+
+            <button id="btnTelecharger" class="secondaire" disabled>⬇️ Télécharger .txt</button>
+
+            <textarea class="log" id="log" readonly placeholder="Le journal et l'aperçu s'afficheront ici…"></textarea>
+        </div>
+
+        <footer>Eli Daniel — générateur de dictionnaire de mots de passe (C# / ASP.NET)</footer>
+    </div>
+
+    <script>
+        let lignes = [];
+        const $ = id => document.getElementById(id);
+        const log = $('log');
+
+        function corps() {
+            return {
+                min: parseInt($('min').value, 10),
+                max: parseInt($('max').value, 10),
+                lower: $('lower').checked, upper: $('upper').checked, digits: $('digits').checked,
+                lowerCustom: $('lowerCustom').value, upperCustom: $('upperCustom').value, numberCustom: $('numberCustom').value,
+                specials: [...document.querySelectorAll('.sp:checked')].map(c => c.value).join(''),
+                customSpecial: $('customSpecial').value
+            };
+        }
+
+        $('btnGenerer').addEventListener('click', async () => {
+            $('btnTelecharger').disabled = true;
+            log.value = 'Génération…';
+            try {
+                const r = await fetch('/api/generer', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(corps()) });
+                const d = await r.json();
+                if (!r.ok) { log.value = '⚠️ ' + (d.error || 'Erreur'); $('count').textContent = '0'; $('charset').textContent = '—'; return; }
+                if (d.tropGrand) { log.value = '⚠️ ' + d.message + '\nRéduis la longueur max ou le nombre de caractères.'; $('count').textContent = '0'; $('charset').textContent = d.charset; return; }
+                lignes = d.mots;
+                $('count').textContent = d.total.toLocaleString('fr-FR');
+                $('charset').textContent = d.charset || '∅';
+                const apercu = lignes.slice(0, 500);
+                log.value = `Jeu de caractères (${d.charset.length}) : ${d.charset}\n` +
+                            `Total : ${d.total.toLocaleString('fr-FR')} mots\n\n` +
+                            `Aperçu (${apercu.length} premières lignes) :\n` + apercu.join('\n');
+                log.scrollTop = 0;
+                $('btnTelecharger').disabled = lignes.length === 0;
+            } catch (e) { log.value = '⚠️ Impossible de contacter le serveur.'; }
+        });
+
+        $('btnTelecharger').addEventListener('click', () => {
+            if (!lignes.length) return;
+            const blob = new Blob([lignes.join('\n')], { type:'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'dictionnaire.txt';
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        });
+    </script>
+</body>
+</html>

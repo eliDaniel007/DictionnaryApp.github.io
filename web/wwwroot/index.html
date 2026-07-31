@@ -26,11 +26,15 @@
         .check { display:flex; align-items:center; gap:.45rem; font-size:.9rem; cursor:pointer; user-select:none; }
         .check input { width:1.05rem; height:1.05rem; accent-color:var(--primary); cursor:pointer; }
         .special { display:flex; flex-wrap:wrap; gap:.4rem 1rem; margin-bottom:.8rem; }
-        button { background:var(--gradient); color:var(--light); border:none; border-radius:8px; padding:.8rem; font-size:1rem; font-weight:600; cursor:pointer; transition:transform .2s, box-shadow .2s; }
-        button:hover { transform:translateY(-2px); box-shadow:0 5px 16px rgba(255,46,99,.3); }
-        button.secondaire { background:rgba(108,99,255,.15); border:1px solid rgba(108,99,255,.4); }
-        .stats { display:flex; justify-content:space-between; gap:1rem; font-size:.9rem; opacity:.9; flex-wrap:wrap; }
-        .stats strong { color:var(--primary); }
+        button, a.btn { display:inline-block; text-align:center; text-decoration:none; background:var(--gradient); color:var(--light); border:none; border-radius:8px; padding:.8rem; font-size:1rem; font-weight:600; cursor:pointer; transition:transform .2s, box-shadow .2s; }
+        button:hover, a.btn:hover { transform:translateY(-2px); box-shadow:0 5px 16px rgba(255,46,99,.3); }
+        a.btn.secondaire { background:rgba(108,99,255,.15); border:1px solid rgba(108,99,255,.4); }
+        a.btn.disabled { opacity:.5; pointer-events:none; }
+        .stat-total { text-align:center; padding:.8rem; background:rgba(108,99,255,.1); border-radius:12px; }
+        .stat-total .n { font-size:1.6rem; font-weight:700; color:var(--primary); }
+        .stat-total .l { font-size:.8rem; opacity:.8; }
+        .charset-line { font-size:.85rem; opacity:.9; word-break:break-all; }
+        .charset-line strong { color:var(--primary); font-family:'Courier New',monospace; }
         .log { width:100%; min-height:150px; max-height:260px; resize:vertical; background:rgba(13,13,13,.7); border:1px solid rgba(108,99,255,.2); border-radius:10px; color:#b8f0c0; font-family:'Courier New',monospace; font-size:.82rem; line-height:1.5; padding:.8rem; white-space:pre; overflow:auto; }
         footer { text-align:center; margin-top:2rem; opacity:.6; font-size:.85rem; }
     </style>
@@ -39,14 +43,14 @@
     <div class="wrap">
         <header>
             <h1>Générateur de Dictionnaire</h1>
-            <p>Version web de mon application WPF. La logique C# (jeu de caractères + énumération des combinaisons) est reprise et tourne côté serveur. <strong>Démo</strong> : génération plafonnée pour rester fluide.</p>
+            <p>Version web de mon application WPF. La logique C# (jeu de caractères + énumération des combinaisons) est reprise et tourne côté serveur. Le nombre affiché est le <strong>total réel</strong> ; le téléchargement génère un vrai fichier (jusqu'à plusieurs millions de mots).</p>
             <a class="back" href="https://elidaniel007.github.io/projets.html">← Retour aux projets</a>
         </header>
 
         <div class="card">
             <div class="row">
                 <label class="field">Longueur min<input type="number" id="min" value="1" min="1"></label>
-                <label class="field">Longueur max<input type="number" id="max" value="3" min="1"></label>
+                <label class="field">Longueur max<input type="number" id="max" value="4" min="1" max="8"></label>
             </div>
 
             <fieldset>
@@ -80,27 +84,27 @@
                 <input type="text" id="customSpecial" placeholder="ou perso : @!+">
             </fieldset>
 
-            <button id="btnGenerer">⚙️ Générer le dictionnaire</button>
+            <button id="btnGenerer">⚙️ Calculer & générer</button>
 
-            <div class="stats">
-                <span>Mots générés : <strong id="count">0</strong></span>
-                <span>Caractères : <strong id="charset">—</strong></span>
+            <div class="stat-total">
+                <div class="n" id="total">—</div>
+                <div class="l">combinaisons possibles</div>
             </div>
+            <div class="charset-line">Jeu de caractères : <strong id="charset">—</strong></div>
 
-            <button id="btnTelecharger" class="secondaire" disabled>⬇️ Télécharger .txt</button>
+            <a href="#" id="btnTelecharger" class="btn secondaire disabled">⬇️ Télécharger le dictionnaire (.txt)</a>
 
-            <textarea class="log" id="log" readonly placeholder="Le journal et l'aperçu s'afficheront ici…"></textarea>
+            <textarea class="log" id="log" readonly placeholder="L'aperçu s'affichera ici…"></textarea>
         </div>
 
         <footer>Eli Daniel — générateur de dictionnaire de mots de passe (C# / ASP.NET)</footer>
     </div>
 
     <script>
-        let lignes = [];
         const $ = id => document.getElementById(id);
         const log = $('log');
 
-        function corps() {
+        function params() {
             return {
                 min: parseInt($('min').value, 10),
                 max: parseInt($('max').value, 10),
@@ -111,34 +115,32 @@
             };
         }
 
+        function majTelechargement(p) {
+            const q = new URLSearchParams(p).toString();
+            $('btnTelecharger').href = '/api/telecharger?' + q;
+            $('btnTelecharger').classList.remove('disabled');
+        }
+
         $('btnGenerer').addEventListener('click', async () => {
-            $('btnTelecharger').disabled = true;
-            log.value = 'Génération…';
+            $('btnTelecharger').classList.add('disabled');
+            log.value = 'Calcul…';
+            const p = params();
             try {
-                const r = await fetch('/api/generer', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(corps()) });
+                const r = await fetch('/api/generer', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(p) });
                 const d = await r.json();
-                if (!r.ok) { log.value = '⚠️ ' + (d.error || 'Erreur'); $('count').textContent = '0'; $('charset').textContent = '—'; return; }
-                if (d.tropGrand) { log.value = '⚠️ ' + d.message + '\nRéduis la longueur max ou le nombre de caractères.'; $('count').textContent = '0'; $('charset').textContent = d.charset; return; }
-                lignes = d.mots;
-                $('count').textContent = d.total.toLocaleString('fr-FR');
-                $('charset').textContent = d.charset || '∅';
-                const apercu = lignes.slice(0, 500);
-                log.value = `Jeu de caractères (${d.charset.length}) : ${d.charset}\n` +
-                            `Total : ${d.total.toLocaleString('fr-FR')} mots\n\n` +
+                if (!r.ok) { log.value = '⚠️ ' + (d.error || 'Erreur'); $('total').textContent = '—'; $('charset').textContent = '—'; return; }
+
+                $('total').textContent = d.astronomique ? 'astronomique' : d.total.toLocaleString('fr-FR');
+                $('charset').textContent = d.charset + ' (' + d.charset.length + ')';
+
+                const apercu = d.apercu;
+                const tot = d.astronomique ? 'un nombre astronomique' : d.total.toLocaleString('fr-FR');
+                log.value = `Total réel : ${tot} combinaisons\n` +
+                            `Téléchargement : jusqu'à ${d.maxTelechargement.toLocaleString('fr-FR')} mots (streamé)\n\n` +
                             `Aperçu (${apercu.length} premières lignes) :\n` + apercu.join('\n');
                 log.scrollTop = 0;
-                $('btnTelecharger').disabled = lignes.length === 0;
+                majTelechargement(p);
             } catch (e) { log.value = '⚠️ Impossible de contacter le serveur.'; }
-        });
-
-        $('btnTelecharger').addEventListener('click', () => {
-            if (!lignes.length) return;
-            const blob = new Blob([lignes.join('\n')], { type:'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = 'dictionnaire.txt';
-            document.body.appendChild(a); a.click(); document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
         });
     </script>
 </body>

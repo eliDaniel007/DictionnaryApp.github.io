@@ -7,6 +7,8 @@ namespace DicoWeb;
 /// WPF « Générateur de Dictionnaire de Mots de Passe » (Oumar Diogo Bah &
 /// Eli Daniel Senyo). Construit le jeu de caractères autorisés puis énumère
 /// toutes les combinaisons pour chaque longueur (compteur type « odomètre »).
+/// L'énumération est paresseuse (yield) : comme l'app d'origine qui écrit dans
+/// un fichier, elle peut produire des millions de mots sans tout garder en mémoire.
 /// </summary>
 public static class Generateur
 {
@@ -20,37 +22,32 @@ public static class Generateur
     public static string ConstruireCharset(Options o)
     {
         var chars = new StringBuilder();
-
         chars.Append(!string.IsNullOrWhiteSpace(o.LowerCustom) ? o.LowerCustom!.Trim()
             : (o.Lower ? "abcdefghijklmnopqrstuvwxyz" : ""));
         chars.Append(!string.IsNullOrWhiteSpace(o.UpperCustom) ? o.UpperCustom!.Trim()
             : (o.Upper ? "ABCDEFGHIJKLMNOPQRSTUVWXYZ" : ""));
         chars.Append(!string.IsNullOrWhiteSpace(o.NumberCustom) ? o.NumberCustom!.Trim()
             : (o.Digits ? "0123456789" : ""));
-
         if (!string.IsNullOrEmpty(o.Specials)) chars.Append(o.Specials);
         if (!string.IsNullOrWhiteSpace(o.CustomSpecial)) chars.Append(o.CustomSpecial!.Trim());
-
         return new string(chars.ToString().Distinct().ToArray());
     }
 
-    // Reproduit CalculateTotalCombinations().
-    public static long CalculerTotal(int min, int max, int taille)
+    // Reproduit CalculateTotalCombinations(). Renvoie aussi si le total dépasse
+    // la capacité d'un entier 64 bits (nombres astronomiques).
+    public static (long total, bool astronomique) CalculerTotal(int min, int max, int taille)
     {
-        long total = 0;
+        double t = 0;
         for (int len = min; len <= max; len++)
-            total += (long)Math.Pow(taille, len);
-        return total;
+            t += Math.Pow(taille, len);
+        if (t > (double)long.MaxValue) return (long.MaxValue, true);
+        return ((long)t, false);
     }
 
-    /// <summary>Génère toutes les combinaisons (plafonnées). Renvoie la liste et le total réel.</summary>
-    public static (List<string> mots, long total, bool tropGrand) Generer(string charset, int min, int max, int plafond)
+    /// <summary>Énumère paresseusement toutes les combinaisons (reproduit la boucle + IncrementIndices).</summary>
+    public static IEnumerable<string> Enumerer(string charset, int min, int max)
     {
-        long total = CalculerTotal(min, max, charset.Length);
-        if (charset.Length == 0 || total > plafond)
-            return (new List<string>(), total, charset.Length > 0 && total > plafond);
-
-        var res = new List<string>((int)Math.Min(total, plafond));
+        if (charset.Length == 0) yield break;
         for (int length = min; length <= max; length++)
         {
             var indices = new int[length];
@@ -58,11 +55,10 @@ public static class Generateur
             {
                 var c = new char[length];
                 for (int i = 0; i < length; i++) c[i] = charset[indices[i]];
-                res.Add(new string(c));
+                yield return new string(c);
             }
             while (Incrementer(indices, charset.Length));
         }
-        return (res, total, false);
     }
 
     // Reproduit IncrementIndices().

@@ -13,7 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 var app = builder.Build();
 
 const int MAX_LONGUEUR = 8;          // borne la longueur (le total reste énorme)
-const long MAX_TELECHARGEMENT = 5_000_000; // lignes max dans le .txt (démo)
+const long MAX_TELECHARGEMENT = 10_000_000; // lignes max dans le .txt (démo)
 
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 app.Urls.Clear();
